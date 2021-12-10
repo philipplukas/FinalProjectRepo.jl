@@ -1,6 +1,26 @@
 using Plots
+using Printf
 using IJulia
 using LinearAlgebra
+
+const USE_GPU = false
+using ParallelStencil
+using ParallelStencil.FiniteDifferences3D
+@static if USE_GPU
+    @init_parallel_stencil(CUDA, Float64, 3)
+else
+    @init_parallel_stencil(Threads, Float64, 3)
+end
+
+@parallel function computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz,D, delta_tau, damp, dt)
+    @all(qx)   = -D*@d_xa(C_tau)/dx
+    @all(qy)   = -D*@d_ya(C_tau)/dy
+    @all(qz)   = -D*@d_za(C_tau)/dz
+    @all(ResC) = -((@inn(C_tau) - @inn(C))/dt) - (@d_xi(qx)/dx + @d_yi(qy)/dy + @d_zi(qz)/dz)
+    @all(dCdtTau)    = @all(ResC) + damp * @all(dCdtTau)
+    @inn(C_tau) = @inn(C_tau) + delta_tau.*@all(dCdtTau)
+    return
+end
 
 """
 Main fucntion of diffusion solver.
@@ -25,14 +45,10 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
     while iter < maxiter
 
-        qx         .= .-D.*diff(C_tau[:,2:end-1, 2:end-1],dims=1)./dx
-        qy         .= .-D.*diff(C_tau[2:end-1,:, 2:end-1],dims=2)./dy
-        qz         .= .-D.*diff(C_tau[2:end-1, 2:end-1, :],dims=3)./dz
-        ResC        .= .-((C_tau[2:end-1,2:end-1,2:end-1] .- C[2:end-1,2:end-1,2:end-1])./dt) .- (diff(qx,dims=1)./dx .+ diff(qy,dims=2)./dy .+ diff(qz,dims=3)./dz)
-        dCdtTau       .= ResC .+ damp .* dCdtTau
-        C_tau[2:end-1,2:end-1,2:end-1] .= C_tau[2:end-1,2:end-1,2:end-1] .+ delta_tau.*dCdtTau
 
-        # @show norm(ResC)/sqrt(nx*ny*nz)
+        computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz, D,delta_tau,damp, dt)
+        
+        @show norm(ResC)/sqrt(nx*ny*nz)
         ((norm(ResC)/sqrt(nx*ny*nz)) > 1e-8) || break
 
         iter += 1

@@ -26,7 +26,7 @@ Main fucntion of diffusion solver.
     for x in 1:nx
         for y in 1:ny
             for z in 1:nz
-                C[x,y,z] = exp(-(xc[x] - lx/2)^2 -(yc[y] - ly/2)^2 -(zc[z] - lz/2)^2)
+                C[x,y,z] = 2 * exp(-(xc[x] - lx/2)^2 -(yc[y] - ly/2)^2 -(zc[z] - lz/2)^2)
             end
         end
     end
