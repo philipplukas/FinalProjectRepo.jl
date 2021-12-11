@@ -1,3 +1,7 @@
+# Run as MPI-program:
+# ~/.julia/bin/mpiexecjl -n 1 julia --project diffusion3D_multixpu.jl
+
+
 using Plots
 using Printf
 using IJulia
@@ -80,13 +84,14 @@ end
     ttot       = 1.0              # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
-    ny = nz = nx = 32
+    ny = nz = nx = 64
     nout   = 1
 
 
     me, dims = init_global_grid(nx, ny, nz, init_MPI=true)  # Initialization of MPI and more...
     @static if USE_GPU select_device() end  # select one GPU per MPI local rank (if >1 GPU per node)
     dx, dy, dz  = lx/nx_g(), ly/ny_g(), lz/nz_g()
+    
 
     # Derived numerics
     #dx, dy, dz = lx/nx, ly/ny, lz/nz 
