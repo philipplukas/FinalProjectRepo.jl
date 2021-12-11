@@ -3,7 +3,7 @@ using Printf
 using IJulia
 using LinearAlgebra
 
-const USE_GPU = false
+const USE_GPU = true
 using ParallelStencil
 using ParallelStencil.FiniteDifferences3D
 @static if USE_GPU
@@ -42,13 +42,13 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     @show delta_tau
 
     C_tau = copy(C)
-    dCdtTau = zeros(Float64, nx-2,ny-2,nz-2)
-    ResC = zeros(Float64, nx-2,ny-2,nz-2)
+    dCdtTau = @zeros( nx-2,ny-2,nz-2)
+    ResC = @zeros( nx-2,ny-2,nz-2)
 
 
-    qx     = zeros(Float64, nx-1,ny-2, nz-2)
-    qy     = zeros(Float64, nx-2,ny-1, nz-2)
-    qz     = zeros(Float64, nx-2,ny-2, nz-1)
+    qx     = @zeros( nx-1,ny-2, nz-2)
+    qy     = @zeros( nx-2,ny-1, nz-2)
+    qz     = @zeros( nx-2,ny-2, nz-1)
 
     damp = 1.0 - 2π/nx
     iter = 0
