@@ -10,12 +10,20 @@ end
     return ((A[:, 1:end-1] .+ A[:,2:end]) ./ 2) 
 end
 
+@views function avNbX(A) 
+    return ((A[1:end-2, :] .+ A[3:end, :]) ./ 2) 
+end
+
+@views function avNbY(A) 
+    return ((A[:, 1:end-2] .+ A[:,3:end]) ./ 2) 
+end
+
 """
 Main fucntion of diffusion solver.
 """
 @views function diffusion3D(nx; do_visu = false)
     # Physics
-    lx, ly = 500.0, 100.0       # domain size
+    lx, ly = 100.0, 100.0       # domain size
     ttot       = 100              # total simulation time
     
     rho = 997 # Density of water
@@ -32,14 +40,14 @@ Main fucntion of diffusion solver.
     # Array initialisation
     H = ones(Float64, nx, ny)
     H[1:div(nx,4),:] .= 60 + 1
-    for i in 1:100
-        H[div(nx,4)+i,:] .= 60 - i*(60/100) + 1
+    for i in 1:20
+        H[div(nx,4)+i,:] .= 60 - i*3 + 1
     end
-    H[div(nx,4)+101:100,:] .= 0 + 1
+    H[div(nx,4)+21:100,:] .= 0 + 1
     display(surface(xc,yc,H',zlims=(0,80)))
     sleep(2)
     # CFL condition accroding to https://aip.scitation.org/doi/abs/10.1063/1.4940835
-    dt =  min(dx,dy) / sqrt(maximum(H)*g)
+    dt = 0.01 * min(dx,dy) / sqrt(maximum(H)*g)
     nt     = cld(ttot, dt)
     @show dt
     #return
@@ -49,7 +57,6 @@ Main fucntion of diffusion solver.
     u_temp = zeros(Float64, nx+1, ny)
     v_temp = zeros(Float64, nx, ny+1)
 
-    #@show H
     # Time loop
     for it = 1:nt
 
@@ -62,24 +69,22 @@ Main fucntion of diffusion solver.
         #    diff((rho .* avY(H) .* avX(avY(u)).^2) .+ (0.5 .* rho .* g .* avY(H).^2) , dims=1)./dx .+
         #    diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2)./dy
         #))
-        # Update of u and vector
-        #@show avX(avY(H))
+        
 
-        u_temp[2:end-1,2:end-1] .= u[2:end-1,2:end-1] .+ avY(
+        u_temp[3:end-2,3:end-2] .= avNbX(u[2:end-1,3:end-2]) .+ avY(
                     dt .* .-(
-                        diff((rho .* avY(H) .* avX(avY(u)).^2) .+ (0.5 .* rho .* g .* avY(H).^2) , dims=1)./dx .+
-                        diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2)./dy
-                    ) ./ (rho .* avX(avY(H)))
+                        avNbX(diff((rho .* avY(H) .* avX(avY(u)).^2) .+ (0.5 .* rho .* g .* avY(H).^2) , dims=1))[:,2:end-1]./dx .+
+                        avNbX(diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2))[:,2:end-1]./dy
+                    ) ./ (rho .* avX(avY(H)))[2:end-1,2:end-1]
                  )
         
-        v_temp[2:end-1,2:end-1] .= v[2:end-1,2:end-1] .+ avX(
+        v_temp[3:end-2,3:end-2] .= avNbY(v[3:end-2,2:end-1]) .+ avX(
                     dt .* .-(
-                    diff(rho .* avY(H) .* avX(avY(u)) .* v[:,2:end-1] , dims=1)./dx .+
-                    diff((rho .* avX(H) .* avX(avY(v)).^2) .+ (0.5 .* rho .* g .* avX(H).^2) , dims=2)./dy
-                    ) ./ (rho .*  avX(avY(H)))
+                    avNbY(diff(rho .* avY(H) .* avX(avY(u)) .* v[:,2:end-1] , dims=1))[2:end-1,:]./dx .+
+                    avNbY(diff((rho .* avX(H) .* avX(avY(v)).^2) .+ (0.5 .* rho .* g .* avX(H).^2) , dims=2))[2:end-1,:]./dy
+                    ) ./ (rho .*  avX(avY(H)))[2:end-1,2:end-1]
                 )
 
-        #@show u_temp
 
         u .= u_temp
         v .= v_temp
@@ -88,13 +93,11 @@ Main fucntion of diffusion solver.
         #@show size(avX(H[:,2:end-1]))
         #@show size(u)
         #@show size(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))
-        #@show u[2:end-1,2:end-1]
-        H[2:end-1,2:end-1] .= H[2:end-1,2:end-1] .+ dt .* .-(
-                            diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1)./ dx .+
-                            diff(rho .* avY(H[2:end-1,:]) .* v[2:end-1,2:end-1], dims=2)./ dy
+        @show size(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))
+        H[3:end-2,3:end-2] .= H[3:end-2,3:end-2] .+ dt .* .-(
+                            avNbX(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))[:,2:end-1]./ dx .+
+                            avNbY(diff(rho .* avY(H[2:end-1,:]) .* v[2:end-1,2:end-1], dims=2))[2:end-1,:]./ dy
                         ) ./ rho
-
-        #@show H
 
 
         @show it

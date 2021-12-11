@@ -1,5 +1,5 @@
 # Part 1 of final project: Diffusion equation
-@include("diffusion3D.jl")
+include("diffusion3D_xpu.jl")
 
 @views function init()
     nx_g = 30             # number of global grid points
@@ -16,4 +16,4 @@ end
 xc_g, H = init();
 
 xc_g_2 = xc_g
-H2 = diffusion3D(30)
+H2 = diffusion3D(32)

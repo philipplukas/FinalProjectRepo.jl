@@ -33,7 +33,7 @@ Main fucntion of diffusion solver.
     H =  20 .* exp.(.-((xc .- (lx/2))./3).^2 .-((yc' .- (ly/2))./3).^2 ) .+ 20
 
     # CFL condition accroding to https://aip.scitation.org/doi/abs/10.1063/1.4940835
-    dt = 0.5 * min(dx,dy) / sqrt(maximum(H)*g)
+    dt = 0.1 * min(dx,dy) / sqrt(maximum(H)*g)
     nt     = cld(ttot, dt)
     @show dt
     #return
@@ -56,14 +56,14 @@ Main fucntion of diffusion solver.
         #    diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2)./dy
         #))
         # Update of u and vector
-        u_temp[2:end-1,2:end-1] .= u_temp[2:end-1,2:end-1] .+ avY(
+        u_temp[2:end-1,2:end-1] .= u[2:end-1,2:end-1] .+ avY(
                     dt .* .-(
                         diff((rho .* avY(H) .* avX(avY(u)).^2) .+ (0.5 .* rho .* g .* avY(H).^2) , dims=1)./dx .+
                         diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2)./dy
                     ) ./ (rho .* avX(avY(H)))
                  )
         
-        v_temp[2:end-1,2:end-1] .= v_temp[2:end-1,2:end-1] .+ avX(
+        v_temp[2:end-1,2:end-1] .= v[2:end-1,2:end-1] .+ avX(
                     dt .* .-(
                     diff(rho .* avY(H) .* avX(avY(u)) .* v[:,2:end-1] , dims=1)./dx .+
                     diff((rho .* avX(H) .* avX(avY(v)).^2) .+ (0.5 .* rho .* g .* avX(H).^2) , dims=2)./dy
@@ -101,4 +101,4 @@ Main fucntion of diffusion solver.
 
 end
 
-diffusion3D(512)
+diffusion3D(256)

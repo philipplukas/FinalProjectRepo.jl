@@ -13,10 +13,12 @@ else
 end
 
 @parallel function computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz,D, delta_tau, damp, dt)
-    @all(qx)   = -D*@d_xa(C_tau)/dx
-    @all(qy)   = -D*@d_ya(C_tau)/dy
-    @all(qz)   = -D*@d_za(C_tau)/dz
-    @all(ResC) = -((@inn(C_tau) - @inn(C))/dt) - (@d_xi(qx)/dx + @d_yi(qy)/dy + @d_zi(qz)/dz)
+
+    @all(qx)   = -D*@d_xi(C_tau)/dx
+    @all(qy)   = -D*@d_yi(C_tau)/dy
+    @all(qz)   = -D*@d_zi(C_tau)/dz
+
+    @all(ResC) = -((@inn(C_tau) - @inn(C))/dt) - (@d_xa(qx)/dx + @d_ya(qy)/dy + @d_za(qz)/dz)
     @all(dCdtTau)    = @all(ResC) + damp * @all(dCdtTau)
     @inn(C_tau) = @inn(C_tau) + delta_tau.*@all(dCdtTau)
     return
@@ -27,18 +29,19 @@ Main fucntion of diffusion solver.
 """
 function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
-    delta_tau  = (dx*dy*dz)/D/8.1
+    delta_tau  = min(dx,dy,dz)^2/D/8.1
     maxiter = 1e5
     @show delta_tau
 
     C_tau = copy(C)
-    dCdtTau = zeros(Float64, nx-2,ny-2,nz-2)
-    ResC = zeros(Float64, nx-2,ny-2,nz-2)
+    @show size(C_tau)
+    dCdtTau = @zeros(nx-2,ny-2,nz-2)
+    ResC = @zeros(nx-2,ny-2,nz-2)
 
 
-    qx     = zeros(Float64, nx-1,ny-2, nz-2)
-    qy     = zeros(Float64, nx-2,ny-1, nz-2)
-    qz     = zeros(Float64, nx-2,ny-2, nz-1)
+    qx     = @zeros(nx-1,ny-2, nz-2)
+    qy     = @zeros(nx-2,ny-1, nz-2)
+    qz     = @zeros(nx-2,ny-2, nz-1)
 
     damp = 1.0 - 2π/nx
     iter = 0
@@ -46,10 +49,10 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     while iter < maxiter
 
 
-        computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz, D,delta_tau,damp, dt)
+        @parallel computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz, D,delta_tau,damp, dt)
         
         @show norm(ResC)/sqrt(nx*ny*nz)
-        ((norm(ResC)/sqrt(nx*ny*nz)) > 1e-8) || break
+        ((norm(ResC)/sqrt(nx*ny*nz)) > 1e-10) || break
 
         iter += 1
     end  
@@ -57,14 +60,14 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     C_tau
 end
 
-@views function diffusion3D(;do_visu=true)
+@views function diffusion3D(nx ;do_visu=true)
     # Physics
     lx, ly, lz = 10.0, 10.0, 10.0 # domain size
     D          = 1.0              # diffusion coefficient
-    ttot       = 100              # total simulation time
+    ttot       = 1.0             # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
-    nx, ny, nz = 128, 128, 128
+    nz = ny = nx
     nout   = 100
     # Derived numerics
     dx, dy, dz = lx/nx, ly/ny, lz/nz 
@@ -75,7 +78,7 @@ end
     zc = LinRange(dy/2, ly-dy/2, ny)
 
     # Array initialisation
-    C = zeros(nx,ny,nz)
+    C = @zeros(nx,ny,nz)
     for x in 1:nx
         for y in 1:ny
             for z in 1:nz
@@ -84,10 +87,6 @@ end
         end
     end
 
-    dCdt   = zeros(Float64, nx-2,ny-2, nz-2)
-    qx     = zeros(Float64, nx-1,ny-2, nz-2)
-    qy     = zeros(Float64, nx-2,ny-1, nz-2)
-    qz     = zeros(Float64, nx-2,ny-2, nz-1)
     # Time loop
     for it = 1:nt
         
@@ -102,6 +101,6 @@ end
             
         end
     end
-    return
+    return Array(C[2:end-1,2:end-1,2:end-1])
 end
-diffusion3D(do_visu=true)
+#diffusion3D(do_visu=true)

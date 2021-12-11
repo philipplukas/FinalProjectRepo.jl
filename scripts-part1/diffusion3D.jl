@@ -8,14 +8,14 @@ Main fucntion of diffusion solver.
     # Physics
     lx, ly, lz = 10.0, 10.0, 10.0 # domain size
     D          = 1.0              # diffusion coefficient
-    ttot       = 100              # total simulation time
+    ttot       = 1.0              # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
     ny = nz = nx
     nout   = 100
     # Derived numerics
     dx, dy, dz = lx/nx, ly/ny, lz/nz 
-    dt     = min(dx, dy, dz)^2/D/6.1
+    dt     = min(dx, dy, dz)^2/D/8.1
     nt     = cld(ttot, dt)
     xc = LinRange(dx/2, lx-dx/2, nx)
     yc = LinRange(dx/2, lx-dx/2, nx)
@@ -52,8 +52,10 @@ Main fucntion of diffusion solver.
         C[2:end-1,2:end-1,2:end-1] .= C[2:end-1,2:end-1,2:end-1] .+ dt.*dCdt
         if do_visu && (it % nout == 0)
             opts = (aspect_ratio=1, xlims=(xc[1], xc[end]), ylims=(yc[1], yc[end]), c=:davos,clims=(0.0, 1.0), xlabel="Lx", ylabel="Ly", title="time = $(round(it*dt, sigdigits=3))")
-            display(heatmap(xc, yc, C[:,Int(ny/2),:]'; opts...))
+            display(heatmap(xc, yc, C[:,div(ny,2),:]'; opts...))
         end
     end
     return C
 end
+
+diffusion3D(30, do_visu=true)

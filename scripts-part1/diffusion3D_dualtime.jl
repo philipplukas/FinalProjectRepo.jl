@@ -7,7 +7,7 @@ Main fucntion of diffusion solver.
 """
 function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
-    delta_tau  = (dx*dy*dz)/D/8.1
+    delta_tau  = min(dx,dy,dz)^2/D/8.1
     maxiter = 1e5
     @show delta_tau
 
@@ -32,7 +32,7 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
         dCdtTau       .= ResC .+ damp .* dCdtTau
         C_tau[2:end-1,2:end-1,2:end-1] .= C_tau[2:end-1,2:end-1,2:end-1] .+ delta_tau.*dCdtTau
 
-        # @show norm(ResC)/sqrt(nx*ny*nz)
+        @show norm(ResC)/sqrt(nx*ny*nz)
         ((norm(ResC)/sqrt(nx*ny*nz)) > 1e-8) || break
 
         iter += 1
@@ -41,14 +41,14 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     C_tau
 end
 
-@views function diffusion3D(;do_visu=true)
+@views function diffusion3D(nx; do_visu=false)
     # Physics
     lx, ly, lz = 10.0, 10.0, 10.0 # domain size
     D          = 1.0              # diffusion coefficient
-    ttot       = 100              # total simulation time
+    ttot       = 1.0              # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
-    nx, ny, nz = 128, 128, 128
+    ny = nz = nx
     nout   = 100
     # Derived numerics
     dx, dy, dz = lx/nx, ly/ny, lz/nz 
@@ -68,10 +68,14 @@ end
         end
     end
 
-    dCdt   = zeros(Float64, nx-2,ny-2, nz-2)
-    qx     = zeros(Float64, nx-1,ny-2, nz-2)
-    qy     = zeros(Float64, nx-2,ny-1, nz-2)
-    qz     = zeros(Float64, nx-2,ny-2, nz-1)
+    # Boundary conditions
+    C[1,:,:] .= 0
+    C[nx,:,:] .= 0
+    C[:,1,:] .= 0
+    C[:,ny,:] .= 0
+    C[:,:,1] .= 0
+    C[:,:,nz] .= 0
+
     # Time loop
     for it = 1:nt
         
@@ -86,6 +90,5 @@ end
             
         end
     end
-    return
+    return C
 end
-diffusion3D(do_visu=true)
