@@ -165,7 +165,7 @@ end
 """
 Main function of diffusion solver.
 """
-@views function diffusion3D(nx; do_visu = false)
+@views function swe(nx; do_visu = false)
     # Physics
     lx, ly = 50.0, 50.0       # domain size
     ttot       = 100              # total simulation time
@@ -201,7 +201,7 @@ Main function of diffusion solver.
     dtv_y = @zeros(nx - 3, ny - 3)
 
     # Time loop
-    for it = 1:nt
+    for it = 1:200
 
         #@show size(avY(H))
         #@show size(avX(avY(u)))
@@ -236,6 +236,8 @@ Main function of diffusion solver.
         #dt = 0.5 * min(dx,dy) / sqrt(maximum(H)*g)
     end
 
+    return H
+
 end
 
-diffusion3D(256)
+#diffusion3D(256)

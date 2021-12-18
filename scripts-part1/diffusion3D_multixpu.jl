@@ -184,4 +184,4 @@ end
     return C
 
 end
-diffusion3D(do_visu=true)
+#diffusion3D(do_visu=true)

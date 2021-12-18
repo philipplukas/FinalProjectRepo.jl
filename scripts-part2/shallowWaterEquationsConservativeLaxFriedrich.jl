@@ -1,5 +1,6 @@
 using Plots
 using IJulia
+using BSON
 
 #https://en.wikipedia.org/wiki/Lax%E2%80%93Friedrichs_method
 
@@ -25,7 +26,7 @@ Main fucntion of diffusion solver.
 @views function diffusion3D(nx; do_visu = false)
     # Physics
     lx, ly = 50.0, 50.0       # domain size
-    ttot       = 100              # total simulation time
+    ttot       = 2              # total simulation time
     
     rho = 997 # Density of water
     g = 9.81# gravitaitonal acceleration
@@ -53,7 +54,7 @@ Main fucntion of diffusion solver.
     v_temp = zeros(Float64, nx, ny+1)
 
     # Time loop
-    for it = 1:nt
+    for it = 1:200
 
         #@show size(avY(H))
         #@show size(avX(avY(u)))
@@ -113,6 +114,7 @@ Main fucntion of diffusion solver.
         #dt = 0.5 * min(dx,dy) / sqrt(maximum(H)*g)
     end
 
+    bson( "swe.bson", H = H)
 end
 
 diffusion3D(256)
