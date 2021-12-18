@@ -60,22 +60,22 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     C_tau
 end
 
-@views function diffusion3D(nx ;do_visu=true)
+@views function diffusion3D(do_visu=true)
     # Physics
     lx, ly, lz = 10.0, 10.0, 10.0 # domain size
     D          = 1.0              # diffusion coefficient
     ttot       = 1.0             # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
-    nz = ny = nx
+    nz = ny = nx = 32 
     nout   = 100
     # Derived numerics
     dx, dy, dz = lx/nx, ly/ny, lz/nz 
     #dt     = min(dx, dy, dz)^2/D/6.1
     nt     = cld(ttot, dt)
     xc = LinRange(dx/2, lx-dx/2, nx)
-    yc = LinRange(dx/2, lx-dx/2, nx)
-    zc = LinRange(dy/2, ly-dy/2, ny)
+    yc = LinRange(dy/2, ly-dy/2, ny)
+    zc = LinRange(dz/2, lz-dz/2, nz)
 
     # Array initialisation
     C = @zeros(nx,ny,nz)
@@ -101,6 +101,6 @@ end
             
         end
     end
-    return Array(C[2:end-1,2:end-1,2:end-1])
+    return C
 end
 #diffusion3D(do_visu=true)

@@ -7,7 +7,9 @@ Main fucntion of diffusion solver.
 """
 function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
-    delta_tau  = min(dx,dy,dz)^2/D/8.1
+    delta_tau  = min(dx,dy,dz)^2/D/6.1
+    #delta_tau = (1.0/(min(dx,dy,dz)^2/D/6.1) + 1.0/dt)^-1
+    
     maxiter = 1e5
     @show delta_tau
 
@@ -20,7 +22,7 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     qy     = zeros(Float64, nx-2,ny-1, nz-2)
     qz     = zeros(Float64, nx-2,ny-2, nz-1)
 
-    damp = 1.0 - 2π/nx
+    damp = 1.0 - 29/nx
     iter = 0
 
     while iter < maxiter
@@ -38,25 +40,25 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
         iter += 1
     end  
 
-    C_tau
+    return C_tau
 end
 
-@views function diffusion3D(nx; do_visu=false)
+@views function diffusion3D(do_visu=false)
     # Physics
     lx, ly, lz = 10.0, 10.0, 10.0 # domain size
     D          = 1.0              # diffusion coefficient
     ttot       = 1.0              # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
-    ny = nz = nx
+    ny = nz = nx = 32
     nout   = 100
     # Derived numerics
     dx, dy, dz = lx/nx, ly/ny, lz/nz 
     #dt     = min(dx, dy, dz)^2/D/6.1
     nt     = cld(ttot, dt)
     xc = LinRange(dx/2, lx-dx/2, nx)
-    yc = LinRange(dx/2, lx-dx/2, nx)
-    zc = LinRange(dy/2, ly-dy/2, ny)
+    yc = LinRange(dy/2, ly-dy/2, ny)
+    zc = LinRange(dz/2, lz-dz/2, nz)
 
     # Array initialisation
     C = zeros(nx,ny,nz)
@@ -92,3 +94,5 @@ end
     end
     return C
 end
+
+diffusion3D()

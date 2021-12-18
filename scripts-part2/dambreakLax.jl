@@ -24,7 +24,7 @@ Main fucntion of diffusion solver.
 @views function diffusion3D(nx; do_visu = false)
     # Physics
     lx, ly = 100.0, 100.0       # domain size
-    ttot       = 100              # total simulation time
+    ttot       = 20            # total simulation time
     
     rho = 997 # Density of water
     g = 9.81# gravitaitonal acceleration
@@ -38,16 +38,17 @@ Main fucntion of diffusion solver.
     yc = LinRange(dy/2, ly-dy/2, ny)
 
     # Array initialisation
-    H = ones(Float64, nx, ny)
-    H[1:div(nx,4),:] .= 60 + 1
+    H = fill(Float64(20), nx, ny)
+    H[1:div(nx,4),:] .= 20 + 20
     for i in 1:20
-        H[div(nx,4)+i,:] .= 60 - i*3 + 1
+        H[div(nx,4)+i,:] .= 20 - i + 20
     end
-    H[div(nx,4)+21:100,:] .= 0 + 1
-    display(surface(xc,yc,H',zlims=(0,80)))
-    sleep(2)
+    H[div(nx,4)+21:100,:] .= 0 + 20
+    display(surface(xc[3:end-2,3:end-2],yc,H[3:end-2,3:end-2]',zlims=(0,80)))
+    sleep(0.1)
     # CFL condition accroding to https://aip.scitation.org/doi/abs/10.1063/1.4940835
-    dt = 0.01 * min(dx,dy) / sqrt(maximum(H)*g)
+    dt = 0.05 * min(dx,dy) / sqrt(maximum(H)*g)
+    @show dt
     nt     = cld(ttot, dt)
     @show dt
     #return
@@ -58,7 +59,8 @@ Main fucntion of diffusion solver.
     v_temp = zeros(Float64, nx, ny+1)
 
     # Time loop
-    for it = 1:nt
+    @show nt
+    for it = 1:4000
 
         #@show size(avY(H))
         #@show size(avX(avY(u)))
@@ -71,23 +73,30 @@ Main fucntion of diffusion solver.
         #))
         
 
-        u_temp[3:end-2,3:end-2] .= avNbX(u[2:end-1,3:end-2]) .+ avY(
+        u_temp[3:end-2,3:end-2] .= avNbX(u[2:end-1,3:end-2]) .+ (
                     dt .* .-(
                         avNbX(diff((rho .* avY(H) .* avX(avY(u)).^2) .+ (0.5 .* rho .* g .* avY(H).^2) , dims=1))[:,2:end-1]./dx .+
                         avNbX(diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2))[:,2:end-1]./dy
-                    ) ./ (rho .* avX(avY(H)))[2:end-1,2:end-1]
-                 )
-        
-        v_temp[3:end-2,3:end-2] .= avNbY(v[3:end-2,2:end-1]) .+ avX(
+                    ) ./ (rho .* avX(avY(H)))[2:end-1,2:end-2]
+
+                    .+
+
                     dt .* .-(
-                    avNbY(diff(rho .* avY(H) .* avX(avY(u)) .* v[:,2:end-1] , dims=1))[2:end-1,:]./dx .+
-                    avNbY(diff((rho .* avX(H) .* avX(avY(v)).^2) .+ (0.5 .* rho .* g .* avX(H).^2) , dims=2))[2:end-1,:]./dy
-                    ) ./ (rho .*  avX(avY(H)))[2:end-1,2:end-1]
-                )
+                        avNbX(diff((rho .* avY(H) .* avX(avY(u)).^2) .+ (0.5 .* rho .* g .* avY(H).^2) , dims=1))[:,2:end-1]./dx .+
+                        avNbX(diff(rho .* avX(H) .* u[2:end-1,:] .* avX(avY(v)), dims=2))[:,2:end-1]./dy
+                    ) ./ (rho .* avX(avY(H)))[2:end-1,3:end-1]
+                 ) ./2
+         
+        #v_temp[3:end-2,3:end-2] .= avNbY(v[3:end-2,2:end-1]) .+ avX(
+        #            dt .* .-(
+        #            avNbY(diff(rho .* avY(H) .* avX(avY(u)) .* v[:,2:end-1] , dims=1))[2:end-1,:]./dx .+
+        #            avNbY(diff((rho .* avX(H) .* avX(avY(v)).^2) .+ (0.5 .* rho .* g .* avX(H).^2) , dims=2))[2:end-1,:]./dy
+        #            ) ./ (rho .*  avX(avY(H)))[2:end-1,2:end-1]
+        #        )
 
 
         u .= u_temp
-        v .= v_temp
+        #v .= v_temp
 
 
         #@show size(avX(H[:,2:end-1]))
@@ -95,9 +104,23 @@ Main fucntion of diffusion solver.
         #@show size(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))
         @show size(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))
         H[3:end-2,3:end-2] .= H[3:end-2,3:end-2] .+ dt .* .-(
-                            avNbX(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))[:,2:end-1]./ dx .+
-                            avNbY(diff(rho .* avY(H[2:end-1,:]) .* v[2:end-1,2:end-1], dims=2))[2:end-1,:]./ dy
+                            avNbX(diff(rho .* avX(H[:,2:end-1]) .* u[2:end-1,2:end-1], dims=1))[:,2:end-1]./ dx #.+
+                            #avNbY(diff(rho .* avY(H[2:end-1,:]) .* v[2:end-1,2:end-1], dims=2))[2:end-1,:]./ dy
                         ) ./ rho
+        H[1,:] .= H[3,:]
+        H[2,:] .= H[3,:]
+        H[end-1,:] .= H[end-2,:]
+        H[end,:] .= H[end-2,:]
+
+        H[:,1] .= H[:, 3]
+        H[:,2] .= H[:, 3]
+        H[:,end-1] .= H[:, end-2]
+        H[:,end] .= H[:, end-2]
+
+        #H[1:2,1:2] .= H[3,3]
+        #H[1:2,end-1:end] .= H[3,end-2]
+        #H[end-1:end,1:2] .= H[end-2,3]
+        #H[end-1:end, end-1:end] .= H[end-2,end-2]
 
 
         @show it
@@ -105,7 +128,7 @@ Main fucntion of diffusion solver.
         #display(heatmap(v_temp'))
         if it % nout == 0
             #display(heatmap(H'))
-            display(surface(xc,yc,H',zlims=(0,80)))
+            display(surface(xc[3:end-2],yc[3:end-2],H[3:end-2,3:end-2]',zlims=(0,80)))
             #update!(scene)
             #sleep(0.3)
             
@@ -118,4 +141,4 @@ Main fucntion of diffusion solver.
 
 end
 
-diffusion3D(512)
+diffusion3D(256)
