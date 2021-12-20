@@ -30,3 +30,6 @@ The methods to be used:
 ## Discussion
 
 ## References
+
+https://en.wikipedia.org/wiki/Shallow_water_equations#cite_note-3
+https://users.oden.utexas.edu/~arbogast/cam397/dawson_v2.pdf
