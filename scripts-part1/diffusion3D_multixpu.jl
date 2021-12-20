@@ -20,12 +20,19 @@ using ImplicitGlobalGrid
 using MPI
 
 
+# MPI based norm function too calculate error on the global grid.
 norm_g(A) = (sum2_l = sum(A.^2); sqrt(MPI.Allreduce(sum2_l, MPI.SUM, MPI.COMM_WORLD)))
 
 
 #Reference
 #https://github.com/eth-cscs/ImplicitGlobalGrid.jl
 
+"""
+Main compute step function using ParallelStencil's @parallels.
+Uses damping to speed up converging process.
+Meaning of parameters can be looked up in the diffusion3D pseudoStep! funciton where they are defiend.
+The names are kept the same.
+"""
 @parallel function computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz,D, delta_tau, damp, dt)
     @all(qx)   = -D*@d_xi(C_tau)/dx
     @all(qy)   = -D*@d_yi(C_tau)/dy
@@ -38,34 +45,46 @@ norm_g(A) = (sum2_l = sum(A.^2); sqrt(MPI.Allreduce(sum2_l, MPI.SUM, MPI.COMM_WO
 end
 
 """
-Main fucntion of diffusion solver.
+One pseudo step corresponds to one time step.
+Each pseudo step ams for a steady state solution for a fixed time according to time C was produces.
 """
 @views function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
+    # This parameter alters the speed of the algoirthm.
+    # For physical correctnes, it needs to be set according to the CFL condition.
     delta_tau  = min(dx,dy,dz)^2/D/8.1
+
+    # In case the error doesn't converge towards zero.
     maxiter = 1e5
     @show delta_tau
 
+    # C is kept fixed and corresponds to time t0
+    # C_tau is iterated on and will hold the solution for time t0 + dt upon convergence.
     C_tau = copy(C)
+
+    # Variables storing intermediate results of each iteration.
     dCdtTau = @zeros( nx-2,ny-2,nz-2)
     ResC = @zeros( nx-2,ny-2,nz-2)
 
-
+    # Fluxes in all direction of the measured quantity (Pressure/concentration, etc...)
     qx     = @zeros( nx-1,ny-2, nz-2)
     qy     = @zeros( nx-2,ny-1, nz-2)
     qz     = @zeros( nx-2,ny-2, nz-1)
 
-    damp = 1.0 - 29/nx
-    iter = 0
 
-    nout = 1
+    # Choosing ad damping parameter which changes with the grid size.
+    damp = 1.0 - 29/nx
+
+
+
+
+    # How often error will be measured; Shouldn't be calculated every iteration for performance reasons.
+    nout = 10
+
+    iter = 0
     err = Inf
 
-    t_tic = 0.0; niter = 0
-
     while (iter < maxiter) && (err > 1e-13)
-
-        if (iter==11) t_tic = Base.time(); niter = 0 end
 
         @parallel computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz, D,delta_tau,damp, dt)
         
@@ -73,20 +92,13 @@ Main fucntion of diffusion solver.
 
         if iter % nout == 0
             err = norm_g(ResC)/sqrt(nx_g()*ny_g()*nz_g())
-            @show err
+            #@show err
         end
         
         iter += 1
-        niter += 1
     end  
 
-    t_toc = Base.time() - t_tic
-    A_eff = 18/1e9*nx*ny*nz*sizeof(Float64)  # Effective main memory access per iteration [GB]
-    t_it  = t_toc/niter                  # Execution time per iteration [s]
-    T_eff = A_eff/t_it                   # Effective memory throughput [GB/s]
-    @printf("Time = %1.3f sec, T_eff = %1.3f GB/s (niter = %d)\n", t_toc, round(T_eff, sigdigits=3), niter)
-
-    return T_eff
+    return C_tau
 end
 
 @views function diffusion3D(nx;do_visu=true)
@@ -95,8 +107,12 @@ end
     D          = 1.0              # diffusion coefficient
     ttot       = 1.0              # total simulation time
     dt         = 0.2              # physical time step
+
+
     # Numerics
     ny = nz = nx
+
+    # Values will be plotted every nout' iteration.
     nout   = 1
 
 
@@ -105,16 +121,9 @@ end
     dx, dy, dz  = lx/nx_g(), ly/ny_g(), lz/nz_g()
     
 
-    # Derived numerics
-    #dx, dy, dz = lx/nx, ly/ny, lz/nz 
-    #dt     = min(dx, dy, dz)^2/D/8.1
-
     nt     = cld(ttot, dt)
-    xc = LinRange(dx/2, lx-dx/2, nx)
-    yc = LinRange(dy/2, ly-dy/2, ny)
-    zc = LinRange(dz/2, lz-dz/2, nz)
 
-    # Array initialisation
+    # Initalize gaussian with amplitude 2 and standard deviation of 1.
     C = @zeros(nx,ny,nz)
     C .= Data.Array([2 * exp(-(x_g(ix,dx,C) - lx/2)^2 -(y_g(iy,dy,C) - ly/2)^2 -(z_g(iz,dz,C) - lz/2)^2) for ix in 1:nx, iy in 1:ny, iz in 1:nz ])
 
@@ -146,8 +155,7 @@ end
 
     # Adapted from:
     # https://eth-vaw-glaciology.github.io/course-101-0250-00/lecture8/
-
-    @show me
+    # Setup for animation 
     if do_visu
         if (me==0) ENV["GKSwstype"]="nul"; if isdir("viz3D_mxpu_out")==false mkdir("viz3D_mxpu_out") end; loadpath = "./viz3D_mxpu_out/"; anim = Animation(loadpath,String[]); println("Animation directory: $(anim.dir)") end
         nx_v, ny_v, nz_v  = (nx-2)*dims[1], (ny-2)*dims[2], (nz-2)*dims[3]
@@ -157,74 +165,37 @@ end
         Xi_g, Yi_g, Zi_g = LinRange(dx+dx/2, lx-dx-dx/2, nx_v), LinRange(dy+dy/2, ly-dy-dy/2, ny_v), LinRange(dz+dz/2, lz-dz-dz/2, nz_v) # inner points only
     end
 
-    @show nt
-    t_tic = 0.0; niter = 0
-    T_eff = 0
-    # Time loop
-    for it = 1:1
 
-        @show it
-        T_eff = pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
-        return T_eff
+    # Time loop
+    for it = 1:nt
+
+        C .= pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
         # Visualize
         if do_visu && (it % nout == 0)
             C_inn .= C[2:end-1,2:end-1, 2:end-1]; gather!(C_inn, C_v)
             if (me==0)
-                @show it * dt
                 #display(scatter(Array(C_v), markersize=100, show_axis=true))
                 opts = (aspect_ratio=1, xlims=(Xi_g[1], Xi_g[end]), ylims=(Yi_g[1], Yi_g[end]), clims=(0.0, 1.0), c=:davos, xlabel="Lx", ylabel="Ly")                #p = plot()
                 #heatmap!(p, Hm..., layout=(3, 1);opts...)
-                l = (4, 1)
-                title = plot(title = "time = $(round(it*dt, sigdigits=3)))", grid = false, showaxis = false, bottom_margin = -50Plots.px)
+                l = (3, 1)
+                #title = plot(title = "time = $(round(it*dt, sigdigits=3))", grid = false, showaxis = false, bottom_margin = -50Plots.px)
                 p1 = heatmap(Xi_g, Yi_g, Array(C_v[:,:,Int(round(0.4*nz_g()))])'; label="time = $(0.25*nz_g())", opts...)
                 p2 = heatmap(Xi_g, Yi_g, Array(C_v[:,:,Int(round(0.5*nz_g()))])'; label="time = $(Int(0.5*nz_g()))", opts...)
                 p3 = heatmap(Xi_g, Yi_g, Array(C_v[:,:,Int(round(0.6*nz_g()))])'; label="time = $(Int(0.75*nz_g()))", opts...)
-                plot(title, p1, p2, p3, layout = l)
+                plot(p1, p2, p3, layout = l, title = "time = $(round(it*dt, sigdigits=3))")
                 frame(anim)
             end
         end
 
         update_halo!(C);    
 
-        niter += 1
     end
 
     if (do_visu && me==0) gif(anim, "diffusion_3D_mxpu.gif", fps = 5)  end
 
     finalize_global_grid();
 
-    @show size(C_v)
-    return T_eff
+    #@show size(C_v)
 end
-#diffusion3D(32, do_visu=true)
-
-
-@views function memory_throughut()
-
-    lx, ly, lz = 10.0, 10.0, 10.0 # domain size
-    dt = 0.2              # physical time step
-
-    tot = 7
-    nx = 16 * 2 .^ (1:tot)
-    teff = @zeros(tot)
-
-    @show nx
-
-    for i in 1:tot
-                # Numerics
-                dx, dy, dz  = lx/nx[i], ly/nx[i], lz/nx[i]
-
-                # Array initialisation
-                C = @zeros(nx,ny,nz)
-                C .= Data.Array([2 * exp(-(x_g(ix,dx,C) - lx/2)^2 -(y_g(iy,dy,C) - ly/2)^2 -(z_g(iz,dz,C) - lz/2)^2) for ix in 1:nx, iy in 1:ny, iz in 1:nz ])
-
-
-                teff[i] = pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
-                opts = (xlabel="nx = ny = nz", ylabel="T_eff")
-                p = plot(nx[1:i], teff[1:i], label="T_eff"; opts...)
-                display(p)
-    end
-    return
-end
-memory_throughut()
+diffusion3D(32, do_visu=true)
