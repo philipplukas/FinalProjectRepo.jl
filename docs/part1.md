@@ -40,8 +40,7 @@ The methods to be used:
 Results section
 
 ### 3D diffusion
-Report an animation of the 3D solution here and provide and concise description of the results. _Unleash your creativity to enhance the visual output._
-
+![diffusion animation](docs/figs/part1/diffusion_3D_mxpu.gif)
 ### Performance
 Briefly elaborate on performance measurement and assess whether you are compute or memory bound for the given physics on the targeted hardware.
 
