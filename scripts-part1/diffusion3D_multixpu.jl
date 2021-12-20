@@ -40,7 +40,7 @@ end
 """
 Main fucntion of diffusion solver.
 """
-function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
+@views function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
 
     delta_tau  = min(dx,dy,dz)^2/D/8.1
     maxiter = 1e5
@@ -61,8 +61,11 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
     nout = 1
     err = Inf
 
+    t_tic = 0.0; niter = 0
+
     while (iter < maxiter) && (err > 1e-13)
 
+        if (iter==11) t_tic = Base.time(); niter = 0 end
 
         @parallel computeStep!(qx,qy,qz,C, ResC, dCdtTau, C_tau, dx, dy, dz, D,delta_tau,damp, dt)
         
@@ -74,19 +77,26 @@ function pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
         end
         
         iter += 1
+        niter += 1
     end  
 
-    C_tau
+    t_toc = Base.time() - t_tic
+    A_eff = 18/1e9*nx*ny*nz*sizeof(Float64)  # Effective main memory access per iteration [GB]
+    t_it  = t_toc/niter                  # Execution time per iteration [s]
+    T_eff = A_eff/t_it                   # Effective memory throughput [GB/s]
+    @printf("Time = %1.3f sec, T_eff = %1.3f GB/s (niter = %d)\n", t_toc, round(T_eff, sigdigits=3), niter)
+
+    return T_eff
 end
 
-@views function diffusion3D(;do_visu=true)
+@views function diffusion3D(nx;do_visu=true)
     # Physics
     lx, ly, lz = 10.0, 10.0, 10.0 # domain size
     D          = 1.0              # diffusion coefficient
     ttot       = 1.0              # total simulation time
     dt         = 0.2              # physical time step
     # Numerics
-    ny = nz = nx = 32
+    ny = nz = nx
     nout   = 1
 
 
@@ -148,12 +158,14 @@ end
     end
 
     @show nt
+    t_tic = 0.0; niter = 0
+    T_eff = 0
     # Time loop
-    for it = 1:nt
-        
-        @show it
-        C .= pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
+    for it = 1:1
 
+        @show it
+        T_eff = pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
+        return T_eff
 
         # Visualize
         if do_visu && (it % nout == 0)
@@ -174,6 +186,8 @@ end
         end
 
         update_halo!(C);    
+
+        niter += 1
     end
 
     if (do_visu && me==0) gif(anim, "diffusion_3D_mxpu.gif", fps = 5)  end
@@ -181,7 +195,36 @@ end
     finalize_global_grid();
 
     @show size(C_v)
-    return C
-
+    return T_eff
 end
-#diffusion3D(do_visu=true)
+#diffusion3D(32, do_visu=true)
+
+
+@views function memory_throughut()
+
+    lx, ly, lz = 10.0, 10.0, 10.0 # domain size
+    dt = 0.2              # physical time step
+
+    tot = 7
+    nx = 16 * 2 .^ (1:tot)
+    teff = @zeros(tot)
+
+    @show nx
+
+    for i in 1:tot
+                # Numerics
+                dx, dy, dz  = lx/nx[i], ly/nx[i], lz/nx[i]
+
+                # Array initialisation
+                C = @zeros(nx,ny,nz)
+                C .= Data.Array([2 * exp(-(x_g(ix,dx,C) - lx/2)^2 -(y_g(iy,dy,C) - ly/2)^2 -(z_g(iz,dz,C) - lz/2)^2) for ix in 1:nx, iy in 1:ny, iz in 1:nz ])
+
+
+                teff[i] = pseudoStep!(C, D, dx, dy, dz,nx,ny,nz, dt)
+                opts = (xlabel="nx = ny = nz", ylabel="T_eff")
+                p = plot(nx[1:i], teff[1:i], label="T_eff"; opts...)
+                display(p)
+    end
+    return
+end
+memory_throughut()
