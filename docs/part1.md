@@ -27,25 +27,29 @@ To accomplish the (mulit-)XPU implementation, I rely on both libraryies, [Parall
 As for the hardware, I am able to run the code on two steups, once on my own computer and once on the supercomputer of the University of Lucern.
 My own laptop is CPU based and powered by a 2.3 GHz 8-Core Intel Core i9 processor. On the supercomputer, my code runs on a GPU based environment with the GPU Nvidia Tesla V100 32GB SXM2.
 
-
-
-
-The methods to be used:
-- spatial and temporal discretisation
-- solution approach
-- hardware
-- ...
-
 ## Results
 Results section
 
 ### 3D diffusion
-![diffusion animation](docs/figs/part1/diffusion_3D_mxpu.gif)
+![diffusion animation](/docs/figs/part1/diffusion_3D_mxpu.gif)
+
+The animation above is generated using the grid size nx = ny = nx = 32.
+The middle shows the x/y surface in the middle of the z-direction at x = 5m.
+The top image shows the x/y plane at x = 2.5, and the bottom image at x = 7.5.
+Since we have a gaussian sphere, the middle one is the brightest image while the brigth circlec in the top and bottom images are smaller.
+
 ### Performance
-Briefly elaborate on performance measurement and assess whether you are compute or memory bound for the given physics on the targeted hardware.
+
+The memory throughput is used to evaluate the performance of the code. The CPU based platform seems to be computer bound for this particular physics problem.
 
 #### Memory throughput
-Strong-scaling on CPU and GPU -> optimal "local" problem sizes.
+
+The below diagram shows the memory throughput on the CPU setup for grid sizes nx = ny = nz = 16,32,128,256,512.
+We can see a significant drop in performance after grid side length 128. The reason for this could that the calculation of the error is very compte intensive. 
+It is therefore likely that we are computer bound for the diffusion problem on the CPU based setup.
+It is very likely that this changes once we move to a GPU based setup.
+
+![Memory throughput CPU](/docs/figs/part1/mem_throughput_cpu.png)
 
 #### Weak scaling
 Multi-GPU weak scaling
