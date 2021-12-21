@@ -240,4 +240,4 @@ Main function of diffusion solver.
 
 end
 
-#diffusion3D(256)
+swe(256; do_visu=true)
